@@ -1,0 +1,114 @@
+name: Standardization
+
+on:
+  workflow_call:
+    inputs:
+      rubocop_max_lines:
+        description: 'Max lines changed for RuboCop fixes'
+        type: string
+        default: '300'
+      stree_max_lines:
+        description: 'Max lines changed for stree formatting'
+        type: string
+        default: '200'
+      prettier_max_lines:
+        description: 'Max lines changed for Prettier formatting'
+        type: string
+        default: '200'
+      rubocop_autocorrect_mode:
+        description: 'RuboCop auto-correct mode'
+        type: string
+        default: '-a'
+      branch_prefix:
+        description: 'Branch name prefix (before timestamp)'
+        type: string
+        default: 'standardization'
+      pr_title_prefix:
+        description: 'PR title prefix (before timestamp)'
+        type: string
+        default: 'chore(tidy): formatting and linting'
+      dry_run:
+        description: 'Analyze and log but do not create PR'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  standardize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout caller repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout standardization scripts
+        uses: actions/checkout@v4
+        with:
+          repository: planningcenter/gh-action-progressive-improvements
+          path: .standardization
+
+      - name: Setup Ruby
+        if: hashFiles('.rubocop.yml') != ''
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Setup Node
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+
+      - name: Install JS dependencies
+        if: hashFiles('package.json') != ''
+        shell: bash
+        run: |
+          if [ -f yarn.lock ]; then
+            yarn install --frozen-lockfile
+          elif [ -f pnpm-lock.yaml ]; then
+            npm install -g pnpm
+            pnpm install --frozen-lockfile
+          elif [ -f bun.lockb ]; then
+            npm install -g bun
+            bun install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Run standardization
+        id: standardize
+        env:
+          RUBOCOP_MAX_LINES: ${{ inputs.rubocop_max_lines || '300' }}
+          STREE_MAX_LINES: ${{ inputs.stree_max_lines || '200' }}
+          PRETTIER_MAX_LINES: ${{ inputs.prettier_max_lines || '200' }}
+          RUBOCOP_AUTOCORRECT_MODE: ${{ inputs.rubocop_autocorrect_mode || '-a' }}
+          BRANCH_PREFIX: ${{ inputs.branch_prefix || 'standardization' }}
+          PR_TITLE_PREFIX: "${{ inputs.pr_title_prefix || 'chore(tidy): formatting and linting' }}"
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          GH_TOKEN: ${{ github.token }}
+        run: bash .standardization/.github/scripts/standardize.sh
+
+      - name: Clean up standardization checkout
+        if: always()
+        run: rm -rf .standardization
+
+      - name: Create or update PR
+        if: steps.standardize.outputs.has_changes == 'true' && steps.standardize.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="${{ steps.standardize.outputs.branch_name }}"
+          title="${{ steps.standardize.outputs.pr_title }}"
+          body_file="${{ runner.temp }}/pr_body.md"
+
+          git push --set-upstream origin "$branch"
+
+          existing_pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing_pr" ]; then
+            gh pr edit "$existing_pr" --title "$title" --body-file "$body_file"
+            echo "Updated existing PR #${existing_pr}"
+          else
+            gh pr create --title "$title" --body-file "$body_file"
+          fi
