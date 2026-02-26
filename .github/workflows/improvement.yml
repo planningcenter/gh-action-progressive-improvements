@@ -1,4 +1,4 @@
-name: Standardization
+name: Progressive Improvement
 
 on:
   workflow_call:
@@ -22,7 +22,7 @@ on:
       branch_prefix:
         description: 'Branch name prefix (before timestamp)'
         type: string
-        default: 'standardization'
+        default: 'improvement'
       pr_title_prefix:
         description: 'PR title prefix (before timestamp)'
         type: string
@@ -37,7 +37,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  standardize:
+  improve:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout caller repo
@@ -45,11 +45,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Checkout standardization scripts
+      - name: Checkout improvement scripts
         uses: actions/checkout@v4
         with:
           repository: planningcenter/gh-action-progressive-improvements
-          path: .standardization
+          path: .improvement
 
       - name: Setup Ruby
         if: hashFiles('.rubocop.yml') != ''
@@ -77,30 +77,30 @@ jobs:
             npm ci
           fi
 
-      - name: Run standardization
-        id: standardize
+      - name: Run improvement
+        id: improve
         env:
           RUBOCOP_MAX_LINES: ${{ inputs.rubocop_max_lines || '300' }}
           STREE_MAX_LINES: ${{ inputs.stree_max_lines || '200' }}
           PRETTIER_MAX_LINES: ${{ inputs.prettier_max_lines || '200' }}
           RUBOCOP_AUTOCORRECT_MODE: ${{ inputs.rubocop_autocorrect_mode || '-a' }}
-          BRANCH_PREFIX: ${{ inputs.branch_prefix || 'standardization' }}
+          BRANCH_PREFIX: ${{ inputs.branch_prefix || 'improvement' }}
           PR_TITLE_PREFIX: "${{ inputs.pr_title_prefix || 'chore(tidy): formatting and linting' }}"
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
           GH_TOKEN: ${{ github.token }}
-        run: bash .standardization/.github/scripts/standardize.sh
+        run: bash .improvement/.github/scripts/improve.sh
 
-      - name: Clean up standardization checkout
+      - name: Clean up improvement checkout
         if: always()
-        run: rm -rf .standardization
+        run: rm -rf .improvement
 
       - name: Create or update PR
-        if: steps.standardize.outputs.has_changes == 'true' && steps.standardize.outputs.dry_run != 'true'
+        if: steps.improve.outputs.has_changes == 'true' && steps.improve.outputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          branch="${{ steps.standardize.outputs.branch_name }}"
-          title="${{ steps.standardize.outputs.pr_title }}"
+          branch="${{ steps.improve.outputs.branch_name }}"
+          title="${{ steps.improve.outputs.pr_title }}"
           body_file="${{ runner.temp }}/pr_body.md"
 
           git push --set-upstream origin "$branch"
