@@ -1,0 +1,28 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# Node (local Prettier testing)
+node_modules/
+
+# Ruby (local RuboCop/stree testing)
+.bundle/
+vendor/bundle/
+
+# Temporary files
+tmp/
+*.tmp
