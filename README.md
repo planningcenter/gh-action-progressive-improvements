@@ -51,7 +51,7 @@ All inputs are optional and have sensible defaults.
 | `prettier_max_lines` | string | `200` | Max lines changed for Prettier formatting |
 | `rubocop_autocorrect_mode` | string | `-a` | `-a` for safe auto-correct, `-A` for all (including unsafe) |
 | `branch_prefix` | string | `improvement` | Prefix for the created branch (e.g. `improvement/2025-02-26-1400`) |
-| `pr_title_prefix` | string | `chore(tidy): formatting and linting` | Prefix for the PR title |
+| `pr_title_prefix` | string | `chore(tidy): formatting and linting` | PR title |
 | `pr_assignees` | string | `''` | Comma-separated GitHub usernames to assign to the PR |
 | `pr_reviewers` | string | `''` | Comma-separated GitHub usernames to request review from |
 | `dry_run` | boolean | `false` | When `true`, analyzes and logs changes but does not commit or open a PR |
@@ -148,7 +148,7 @@ These are declared in the reusable workflow itself, but adding them explicitly t
 Each PR includes a structured summary showing what was changed:
 
 ```markdown
-## chore(tidy): formatting and linting 02/26/2025 14:00
+## chore(tidy): formatting and linting
 
 ### RuboCop: `Style/StringLiterals`
 - Fixed 12 files (87 lines changed)

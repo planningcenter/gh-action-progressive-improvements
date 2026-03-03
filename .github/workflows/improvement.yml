@@ -24,7 +24,7 @@ on:
         type: string
         default: 'improvement'
       pr_title_prefix:
-        description: 'PR title prefix (before timestamp)'
+        description: 'PR title'
         type: string
         default: 'chore(tidy): formatting and linting'
       pr_assignees:

@@ -23,7 +23,6 @@ BRANCH_PREFIX="${BRANCH_PREFIX:-improvement}"
 PR_TITLE_PREFIX="${PR_TITLE_PREFIX:-chore(tidy): formatting and linting}"
 DRY_RUN="${DRY_RUN:-false}"
 
-TIMESTAMP=$(date +"%m/%d/%Y %H:%M")
 BRANCH_NAME="${BRANCH_PREFIX}/$(date +%Y-%m-%d-%H%M)"
 GITHUB_OUTPUT="${GITHUB_OUTPUT:-/dev/null}"
 RUNNER_TEMP="${RUNNER_TEMP:-/tmp}"
@@ -433,7 +432,7 @@ if [ ${#PR_SECTIONS[@]} -eq 0 ]; then
   set_output "has_changes" "false"
   set_output "dry_run" "$DRY_RUN"
 else
-  pr_title="${PR_TITLE_PREFIX} $TIMESTAMP"
+  pr_title="${PR_TITLE_PREFIX}"
 
   {
     echo "## $pr_title"
