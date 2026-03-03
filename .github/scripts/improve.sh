@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ##############################################################################
-# improve.sh — Chip away at RuboCop, stree, and Prettier violations.
+# improve.sh — Chip away at RuboCop, stree, and Prettier/ESLint violations.
 #
 # Env vars (with defaults):
 #   RUBOCOP_MAX_LINES            (300)
@@ -344,7 +344,89 @@ if [ "$has_prettier_config" = "false" ] && [ -f package.json ]; then
   jq -e '.prettier' package.json &>/dev/null 2>&1 && has_prettier_config=true
 fi
 
-if [ -n "$prettier_bin" ] && [ "$has_prettier_config" = "true" ]; then
+# Detect eslint-plugin-prettier
+uses_eslint_prettier=false
+if [ -f node_modules/eslint-plugin-prettier/package.json ]; then
+  uses_eslint_prettier=true
+fi
+
+# Resolve ESLint binary (only when eslint-plugin-prettier detected)
+eslint_bin=""
+if [ "$uses_eslint_prettier" = "true" ]; then
+  if [ -x node_modules/.bin/eslint ]; then
+    eslint_bin="node_modules/.bin/eslint"
+  elif command -v eslint &>/dev/null; then
+    eslint_bin="eslint"
+  elif npx eslint --version &>/dev/null 2>&1; then
+    eslint_bin="npx eslint"
+  fi
+
+  if [ -z "$eslint_bin" ]; then
+    warn "eslint-plugin-prettier detected but ESLint binary not found — falling back to standalone Prettier."
+    uses_eslint_prettier=false
+  fi
+fi
+
+if [ "$uses_eslint_prettier" = "true" ]; then
+  log "eslint-plugin-prettier detected — using ESLint for JS/TS formatting."
+
+  $eslint_bin --fix '**/*.{js,jsx,ts,tsx}' --ignore-pattern 'vendor/**' 2>/dev/null || true
+  lines=$(diff_lines)
+  log "Total ESLint+Prettier diff: $lines lines."
+
+  if [ "$lines" -gt "$PRETTIER_MAX_LINES" ] && [ "$lines" -gt 0 ]; then
+    log "Over budget ($lines > $PRETTIER_MAX_LINES). Subsetting..."
+    changed_files=$(git diff --name-only | sort)
+    total_files=$(echo "$changed_files" | wc -l | tr -d ' ')
+    reset_changes
+
+    subset_count=$(( total_files * PRETTIER_MAX_LINES / lines ))
+    [ "$subset_count" -lt 1 ] && subset_count=1
+    subset_files=$(echo "$changed_files" | head -n "$subset_count")
+    log "Re-running ESLint on $subset_count of $total_files files..."
+
+    echo "$subset_files" | tr '\n' '\0' \
+      | xargs -0 $eslint_bin --fix --no-error-on-unmatched-pattern 2>/dev/null || true
+    lines=$(diff_lines)
+    log "Subset diff: $lines lines."
+
+    # Second trim
+    if [ "$lines" -gt "$PRETTIER_MAX_LINES" ] && [ "$lines" -gt 0 ]; then
+      changed_count=$(git diff --name-only | wc -l | tr -d ' ')
+      reset_changes
+
+      subset_count=$(( changed_count * PRETTIER_MAX_LINES / lines ))
+      [ "$subset_count" -lt 1 ] && subset_count=1
+      subset_files=$(echo "$changed_files" | head -n "$subset_count")
+      log "Second trim: $subset_count files..."
+
+      echo "$subset_files" | tr '\n' '\0' \
+        | xargs -0 $eslint_bin --fix --no-error-on-unmatched-pattern 2>/dev/null || true
+      lines=$(diff_lines)
+      log "Final ESLint+Prettier diff: $lines lines."
+    fi
+  fi
+
+  if [ "$lines" -gt 0 ]; then
+    files_changed=$(git diff --name-only | wc -l | tr -d ' ')
+
+    if [ "$DRY_RUN" = "true" ]; then
+      log "[DRY RUN] Would commit: eslint+prettier fix $files_changed js/ts files ($lines lines)"
+      reset_changes
+    else
+      git add -u
+      git commit -m "eslint+prettier: fix $files_changed js/ts files"
+      HAS_CHANGES="true"
+    fi
+
+    section="### ESLint + Prettier formatting"$'\n'
+    section+="- Fixed $files_changed JS/TS files via \`eslint --fix\` (eslint-plugin-prettier)"$'\n'
+    section+="- $lines lines changed"$'\n'
+    PR_SECTIONS+=("$section")
+  else
+    log "ESLint+Prettier produced no changes."
+  fi
+elif [ -n "$prettier_bin" ] && [ "$has_prettier_config" = "true" ]; then
   log "Running Prettier check..."
   prettier_output=$($prettier_bin --check '**/*.{js,jsx,ts,tsx}' '!vendor/**' 2>&1 || true)
 
