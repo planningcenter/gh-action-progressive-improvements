@@ -247,7 +247,7 @@ fi
 
 if [ -n "$stree_cmd" ]; then
   log "Running stree check..."
-  stree_output=$($stree_cmd check '**/*.rb' 2>&1 || true)
+  stree_output=$($stree_cmd check --ignore-files='vendor/**/*.rb' '**/*.rb' 2>&1 || true)
 
   # Extract .rb file paths from whatever output format stree produces
   stree_files=""
@@ -346,7 +346,7 @@ fi
 
 if [ -n "$prettier_bin" ] && [ "$has_prettier_config" = "true" ]; then
   log "Running Prettier check..."
-  prettier_output=$($prettier_bin --check '**/*.{js,jsx,ts,tsx}' 2>&1 || true)
+  prettier_output=$($prettier_bin --check '**/*.{js,jsx,ts,tsx}' '!vendor/**' 2>&1 || true)
 
   # Strip [warn] prefix (older Prettier) and filter to JS/TS file paths
   prettier_files=$(
