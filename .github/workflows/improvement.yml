@@ -27,6 +27,14 @@ on:
         description: 'PR title prefix (before timestamp)'
         type: string
         default: 'chore(tidy): formatting and linting'
+      pr_assignees:
+        description: 'Comma-separated GitHub usernames to assign to the PR'
+        type: string
+        default: ''
+      pr_reviewers:
+        description: 'Comma-separated GitHub usernames to request review from'
+        type: string
+        default: ''
       dry_run:
         description: 'Analyze and log but do not create PR'
         type: boolean
@@ -98,6 +106,8 @@ jobs:
         if: steps.improve.outputs.has_changes == 'true' && steps.improve.outputs.dry_run != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_ASSIGNEES: ${{ inputs.pr_assignees }}
+          PR_REVIEWERS: ${{ inputs.pr_reviewers }}
         run: |
           branch="${{ steps.improve.outputs.branch_name }}"
           title="${{ steps.improve.outputs.pr_title }}"
@@ -105,10 +115,30 @@ jobs:
 
           git push --set-upstream origin "$branch"
 
+          # Build assignee flags
+          assignee_flags=""
+          if [ -n "$PR_ASSIGNEES" ]; then
+            IFS=',' read -ra assignees <<< "$PR_ASSIGNEES"
+            for user in "${assignees[@]}"; do
+              user=$(echo "$user" | xargs)  # trim whitespace
+              [ -n "$user" ] && assignee_flags+=" --assignee $user"
+            done
+          fi
+
+          # Build reviewer flags
+          reviewer_flags=""
+          if [ -n "$PR_REVIEWERS" ]; then
+            IFS=',' read -ra reviewers <<< "$PR_REVIEWERS"
+            for user in "${reviewers[@]}"; do
+              user=$(echo "$user" | xargs)  # trim whitespace
+              [ -n "$user" ] && reviewer_flags+=" --reviewer $user"
+            done
+          fi
+
           existing_pr=$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')
           if [ -n "$existing_pr" ]; then
-            gh pr edit "$existing_pr" --title "$title" --body-file "$body_file"
+            gh pr edit "$existing_pr" --title "$title" --body-file "$body_file" $assignee_flags $reviewer_flags
             echo "Updated existing PR #${existing_pr}"
           else
-            gh pr create --title "$title" --body-file "$body_file"
+            gh pr create --title "$title" --body-file "$body_file" $assignee_flags $reviewer_flags
           fi
