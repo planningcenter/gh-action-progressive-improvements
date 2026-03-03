@@ -24,6 +24,10 @@ on:
     - cron: '0 14 * * 1' # Every Monday at 2 PM UTC
   workflow_dispatch:       # Allow manual runs
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   improve:
     uses: planningcenter/gh-action-progressive-improvements/.github/workflows/improvement.yml@main
@@ -55,6 +59,10 @@ All inputs are optional and have sensible defaults.
 ### Example with custom inputs
 
 ```yaml
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   improve:
     uses: planningcenter/gh-action-progressive-improvements/.github/workflows/improvement.yml@main
@@ -71,6 +79,10 @@ jobs:
 Let one person volunteer to review all improvement PRs before rolling it out to the whole team:
 
 ```yaml
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   improve:
     uses: planningcenter/gh-action-progressive-improvements/.github/workflows/improvement.yml@main
@@ -119,7 +131,7 @@ permissions:
   pull-requests: write # Create and update PRs
 ```
 
-These are declared in the reusable workflow itself, so you don't need to set them in your calling workflow.
+These are declared in the reusable workflow itself, but adding them explicitly to your calling workflow follows the principle of least privilege and makes the required scopes visible at a glance.
 
 ## Pull Request Output
 
