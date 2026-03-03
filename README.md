@@ -48,6 +48,8 @@ All inputs are optional and have sensible defaults.
 | `rubocop_autocorrect_mode` | string | `-a` | `-a` for safe auto-correct, `-A` for all (including unsafe) |
 | `branch_prefix` | string | `improvement` | Prefix for the created branch (e.g. `improvement/2025-02-26-1400`) |
 | `pr_title_prefix` | string | `chore(tidy): formatting and linting` | Prefix for the PR title |
+| `pr_assignees` | string | `''` | Comma-separated GitHub usernames to assign to the PR |
+| `pr_reviewers` | string | `''` | Comma-separated GitHub usernames to request review from |
 | `dry_run` | boolean | `false` | When `true`, analyzes and logs changes but does not commit or open a PR |
 
 ### Example with custom inputs
@@ -62,6 +64,19 @@ jobs:
       prettier_max_lines: '300'
       rubocop_autocorrect_mode: '-A'
       dry_run: true
+```
+
+### Assigning a shepherd
+
+Let one person volunteer to review all improvement PRs before rolling it out to the whole team:
+
+```yaml
+jobs:
+  improve:
+    uses: planningcenter/gh-action-progressive-improvements/.github/workflows/improvement.yml@main
+    with:
+      pr_assignees: 'octocat'
+      pr_reviewers: 'octocat'
 ```
 
 ## How It Works
