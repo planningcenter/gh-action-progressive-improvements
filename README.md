@@ -109,6 +109,16 @@ The workflow auto-detects your project setup:
 - **Node.js**: Detects your package manager (yarn, pnpm, bun, or npm) and installs dependencies
 - **Prettier**: Checks `node_modules/.bin/prettier`, system `prettier`, then `npx prettier`; also requires a Prettier config file or `prettier` key in `package.json`
 
+### Excluded directories
+
+The workflow automatically excludes vendored dependencies from scanning:
+
+- **stree**: Skips `vendor/**/*.rb` via `--ignore-files`
+- **Prettier**: Skips `node_modules/` (Prettier default) and `vendor/`
+- **RuboCop**: Respects exclusions from your `.rubocop.yml` via `--force-exclusion`
+
+This avoids wasting time scanning third-party code in directories like `vendor/bundle/`.
+
 ### Permissions
 
 The workflow requires these permissions on the caller's `GITHUB_TOKEN`:
