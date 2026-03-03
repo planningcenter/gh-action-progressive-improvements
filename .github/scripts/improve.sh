@@ -98,32 +98,77 @@ if [ -f .rubocop.yml ] && bundle exec rubocop --version &>/dev/null; then
       cop_count=$(echo "$cop_ranking" | wc -l | tr -d ' ')
       log "Found $total_correctable correctable offenses across $cop_count cops."
 
+      # ---------------------------------------------------------------
+      # Incrementally apply cops, checking actual diff after each
+      # ---------------------------------------------------------------
+      applied_cops=()
+      prev_lines=0
+      max_scan=10
       rubocop_committed=false
-      attempt=0
-      max_attempts=3
 
-      while [ "$attempt" -lt "$max_attempts" ] && [ "$rubocop_committed" = "false" ]; do
-        attempt=$((attempt + 1))
-        cop_line=$(echo "$cop_ranking" | sed -n "${attempt}p")
+      cop_idx=0
+      while [ "$cop_idx" -lt "$max_scan" ]; do
+        cop_idx=$((cop_idx + 1))
+        cop_line=$(echo "$cop_ranking" | sed -n "${cop_idx}p")
         [ -z "$cop_line" ] && break
 
         cop_name=$(echo "$cop_line" | awk '{ print $1 }')
         cop_violations=$(echo "$cop_line" | awk '{ print $2 }')
-        log "Attempt $attempt: fixing $cop_name ($cop_violations violations)..."
+        log "Trying $cop_name ($cop_violations violations)..."
 
         bundle exec rubocop --only "$cop_name" "$AUTOCORRECT_MODE" --force-exclusion 2>/dev/null || true
-
         lines=$(diff_lines)
-        log "Diff: $lines lines changed."
+        cop_delta=$((lines - prev_lines))
 
-        if [ "$lines" -eq 0 ]; then
-          log "$cop_name produced no changes — trying next cop."
+        if [ "$cop_delta" -eq 0 ]; then
+          log "$cop_name produced no changes — skipping."
           continue
         fi
 
-        # Over budget → subset to alphabetical slice of files
-        if [ "$lines" -gt "$RUBOCOP_MAX_LINES" ]; then
-          log "Over budget ($lines > $RUBOCOP_MAX_LINES). Subsetting files..."
+        log "$cop_name: +$cop_delta lines (cumulative: $lines)."
+
+        if [ "$lines" -le "$RUBOCOP_MAX_LINES" ]; then
+          applied_cops+=("$cop_name")
+          prev_lines=$lines
+          log "Accepted $cop_name."
+        elif [ ${#applied_cops[@]} -eq 0 ]; then
+          # First viable cop already over budget — accept and subset later
+          applied_cops+=("$cop_name")
+          log "$cop_name exceeds budget alone — will subset."
+          break
+        else
+          # Would push over budget — roll back to accepted cops only
+          log "$cop_name would exceed budget. Rolling back..."
+          reset_changes
+          cops_csv=$(IFS=,; echo "${applied_cops[*]}")
+          bundle exec rubocop --only "$cops_csv" "$AUTOCORRECT_MODE" --force-exclusion 2>/dev/null || true
+          break
+        fi
+      done
+
+      lines=$(diff_lines)
+
+      # Over budget → subset to alphabetical slice of files
+      if [ "$lines" -gt "$RUBOCOP_MAX_LINES" ]; then
+        cops_csv=$(IFS=,; echo "${applied_cops[*]}")
+        log "Over budget ($lines > $RUBOCOP_MAX_LINES). Subsetting files..."
+        changed_files=$(git diff --name-only | sort)
+        total_files=$(echo "$changed_files" | wc -l | tr -d ' ')
+        reset_changes
+
+        subset_count=$(( total_files * RUBOCOP_MAX_LINES / lines ))
+        [ "$subset_count" -lt 1 ] && subset_count=1
+        subset_files=$(echo "$changed_files" | head -n "$subset_count")
+        log "Re-running on $subset_count of $total_files files..."
+
+        echo "$subset_files" | tr '\n' '\0' \
+          | xargs -0 bundle exec rubocop --only "$cops_csv" "$AUTOCORRECT_MODE" --force-exclusion 2>/dev/null || true
+
+        lines=$(diff_lines)
+        log "Subset diff: $lines lines."
+
+        # Second trim if still over
+        if [ "$lines" -gt "$RUBOCOP_MAX_LINES" ] && [ "$lines" -gt 0 ]; then
           changed_files=$(git diff --name-only | sort)
           total_files=$(echo "$changed_files" | wc -l | tr -d ' ')
           reset_changes
@@ -131,58 +176,48 @@ if [ -f .rubocop.yml ] && bundle exec rubocop --version &>/dev/null; then
           subset_count=$(( total_files * RUBOCOP_MAX_LINES / lines ))
           [ "$subset_count" -lt 1 ] && subset_count=1
           subset_files=$(echo "$changed_files" | head -n "$subset_count")
-          log "Re-running on $subset_count of $total_files files..."
+          log "Second trim: $subset_count files..."
 
           echo "$subset_files" | tr '\n' '\0' \
-            | xargs -0 bundle exec rubocop --only "$cop_name" "$AUTOCORRECT_MODE" --force-exclusion 2>/dev/null || true
+            | xargs -0 bundle exec rubocop --only "$cops_csv" "$AUTOCORRECT_MODE" --force-exclusion 2>/dev/null || true
 
           lines=$(diff_lines)
-          log "Subset diff: $lines lines changed."
-
-          # Second trim if still over
-          if [ "$lines" -gt "$RUBOCOP_MAX_LINES" ] && [ "$lines" -gt 0 ]; then
-            changed_files=$(git diff --name-only | sort)
-            total_files=$(echo "$changed_files" | wc -l | tr -d ' ')
-            reset_changes
-
-            subset_count=$(( total_files * RUBOCOP_MAX_LINES / lines ))
-            [ "$subset_count" -lt 1 ] && subset_count=1
-            subset_files=$(echo "$changed_files" | head -n "$subset_count")
-            log "Second trim: $subset_count files..."
-
-            echo "$subset_files" | tr '\n' '\0' \
-              | xargs -0 bundle exec rubocop --only "$cop_name" "$AUTOCORRECT_MODE" --force-exclusion 2>/dev/null || true
-
-            lines=$(diff_lines)
-            log "Final diff: $lines lines changed."
-          fi
+          log "Final diff: $lines lines."
         fi
+      fi
 
-        if [ "$lines" -gt 0 ]; then
-          files_changed=$(git diff --name-only | wc -l | tr -d ' ')
+      if [ "$lines" -gt 0 ]; then
+        files_changed=$(git diff --name-only | wc -l | tr -d ' ')
 
-          if [ "$DRY_RUN" = "true" ]; then
-            log "[DRY RUN] Would commit: rubocop $cop_name — $lines lines, $files_changed files"
-            reset_changes
+        if [ "$DRY_RUN" = "true" ]; then
+          cops_csv=$(IFS=,; echo "${applied_cops[*]}")
+          log "[DRY RUN] Would commit: rubocop $cops_csv — $lines lines, $files_changed files"
+          reset_changes
+        else
+          git add -u
+          if [ ${#applied_cops[@]} -eq 1 ]; then
+            git commit -m "rubocop: fix ${applied_cops[0]} ($files_changed files)"
           else
-            git add -u
-            git commit -m "rubocop: fix $cop_name ($files_changed files)"
-            HAS_CHANGES="true"
+            git commit -m "rubocop: fix ${#applied_cops[@]} cops ($files_changed files)"
           fi
-
-          autocorrect_label="Safe auto-correct (\`-a\`)"
-          [ "$AUTOCORRECT_MODE" = "-A" ] && autocorrect_label="All auto-correct (\`-A\`)"
-
-          section="### RuboCop: \`$cop_name\`"$'\n'
-          section+="- Fixed $files_changed files ($lines lines changed)"$'\n'
-          section+="- $autocorrect_label"$'\n'
-          PR_SECTIONS+=("$section")
-
-          rubocop_committed=true
+          HAS_CHANGES="true"
         fi
-      done
 
-      [ "$rubocop_committed" = "false" ] && log "No RuboCop changes produced after $attempt attempts."
+        autocorrect_label="Safe auto-correct (\`-a\`)"
+        [ "$AUTOCORRECT_MODE" = "-A" ] && autocorrect_label="All auto-correct (\`-A\`)"
+
+        section="### RuboCop: ${#applied_cops[@]} cop(s)"$'\n'
+        for c in "${applied_cops[@]}"; do
+          section+="- \`$c\`"$'\n'
+        done
+        section+="- Fixed $files_changed files ($lines lines changed)"$'\n'
+        section+="- $autocorrect_label"$'\n'
+        PR_SECTIONS+=("$section")
+
+        rubocop_committed=true
+      fi
+
+      [ "$rubocop_committed" = "false" ] && log "No RuboCop changes produced."
     else
       log "No correctable offenses found."
     fi
