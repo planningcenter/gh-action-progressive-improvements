@@ -252,6 +252,79 @@ JSON
   [[ "$output" == *"stree"* ]]
 }
 
+@test "stree: excludes db/schema.rb and db/migrate by default" {
+  mkdir -p db/migrate
+  echo 'puts("hello")' > app.rb
+  echo 'puts("schema")' > db/schema.rb
+  echo 'puts("migrate")' > db/migrate/20240101_create_users.rb
+  git add . && git commit -q -m "add files"
+
+  # Mock stree that records the --ignore-files args it receives
+  create_mock "stree" '
+    if [[ "$1" == "version" ]]; then echo "6.0.0"; exit 0; fi
+    if [[ "$1" == "check" ]]; then
+      # Record args for verification
+      echo "$@" > '"$TEST_DIR"'/stree_check_args
+      echo "app.rb"
+      exit 1
+    fi
+    if [[ "$1" == "write" ]]; then
+      shift
+      for f in "$@"; do
+        [ -f "$f" ] && echo "puts(\"hello\")" > "$f"
+      done
+      exit 0
+    fi
+  '
+  create_mock "bundle" 'exit 1'
+
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+
+  # Verify the default ignore patterns were passed
+  local check_args
+  check_args=$(cat "$TEST_DIR/stree_check_args")
+  [[ "$check_args" == *"--ignore-files='vendor/**/*.rb'"* ]]
+  [[ "$check_args" == *"--ignore-files='db/schema.rb'"* ]]
+  [[ "$check_args" == *"--ignore-files='db/migrate/**/*.rb'"* ]]
+}
+
+@test "stree: includes custom STREE_IGNORE_FILES patterns" {
+  echo 'puts("hello")' > app.rb
+  git add app.rb && git commit -q -m "add app.rb"
+
+  create_mock "stree" '
+    if [[ "$1" == "version" ]]; then echo "6.0.0"; exit 0; fi
+    if [[ "$1" == "check" ]]; then
+      echo "$@" > '"$TEST_DIR"'/stree_check_args
+      echo "app.rb"
+      exit 1
+    fi
+    if [[ "$1" == "write" ]]; then
+      shift
+      for f in "$@"; do
+        [ -f "$f" ] && echo "puts(\"hello\")" > "$f"
+      done
+      exit 0
+    fi
+  '
+  create_mock "bundle" 'exit 1'
+
+  export STREE_IGNORE_FILES="lib/generated/**/*.rb app/templates/**/*.rb"
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+
+  local check_args
+  check_args=$(cat "$TEST_DIR/stree_check_args")
+  # Should have defaults
+  [[ "$check_args" == *"--ignore-files='vendor/**/*.rb'"* ]]
+  [[ "$check_args" == *"--ignore-files='db/schema.rb'"* ]]
+  [[ "$check_args" == *"--ignore-files='db/migrate/**/*.rb'"* ]]
+  # And custom patterns
+  [[ "$check_args" == *"--ignore-files='lib/generated/**/*.rb'"* ]]
+  [[ "$check_args" == *"--ignore-files='app/templates/**/*.rb'"* ]]
+}
+
 @test "stree: all files conforming produces no changes" {
   echo 'puts "hello"' > app.rb
   git add app.rb && git commit -q -m "add app.rb"

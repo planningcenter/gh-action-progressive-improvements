@@ -17,6 +17,7 @@ set -euo pipefail
 
 RUBOCOP_MAX_LINES="${RUBOCOP_MAX_LINES:-300}"
 STREE_MAX_LINES="${STREE_MAX_LINES:-200}"
+STREE_IGNORE_FILES="${STREE_IGNORE_FILES:-}"
 PRETTIER_MAX_LINES="${PRETTIER_MAX_LINES:-200}"
 AUTOCORRECT_MODE="${RUBOCOP_AUTOCORRECT_MODE:--a}"
 BRANCH_PREFIX="${BRANCH_PREFIX:-improvement}"
@@ -246,8 +247,18 @@ fi
 
 if [ -n "$stree_cmd" ]; then
   log "Running stree check..."
+
+  # Build --ignore-files flags: sensible defaults + caller-supplied extras
+  stree_ignore_flags="--ignore-files='vendor/**/*.rb'"
+  stree_ignore_flags+=" --ignore-files='db/schema.rb'"
+  stree_ignore_flags+=" --ignore-files='db/migrate/**/*.rb'"
   # shellcheck disable=SC2086
-  stree_output=$($stree_cmd check --ignore-files='vendor/**/*.rb' '**/*.rb' 2>&1 || true)
+  for pattern in $STREE_IGNORE_FILES; do
+    stree_ignore_flags+=" --ignore-files='${pattern}'"
+  done
+
+  # shellcheck disable=SC2086
+  stree_output=$($stree_cmd check $stree_ignore_flags '**/*.rb' 2>&1 || true)
 
   # Extract .rb file paths from whatever output format stree produces
   stree_files=""
