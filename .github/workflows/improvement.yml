@@ -11,6 +11,10 @@ on:
         description: 'Max lines changed for stree formatting'
         type: string
         default: '200'
+      stree_ignore_files:
+        description: 'Additional file patterns to exclude from stree formatting (space-separated globs, e.g. "app/generated/**/*.rb lib/templates/**/*.rb")'
+        type: string
+        default: ''
       prettier_max_lines:
         description: 'Max lines changed for Prettier formatting'
         type: string
@@ -90,6 +94,7 @@ jobs:
         env:
           RUBOCOP_MAX_LINES: ${{ inputs.rubocop_max_lines || '300' }}
           STREE_MAX_LINES: ${{ inputs.stree_max_lines || '200' }}
+          STREE_IGNORE_FILES: ${{ inputs.stree_ignore_files || '' }}
           PRETTIER_MAX_LINES: ${{ inputs.prettier_max_lines || '200' }}
           RUBOCOP_AUTOCORRECT_MODE: ${{ inputs.rubocop_autocorrect_mode || '-a' }}
           BRANCH_PREFIX: ${{ inputs.branch_prefix || 'improvement' }}

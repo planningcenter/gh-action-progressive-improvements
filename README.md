@@ -49,6 +49,7 @@ All inputs are optional and have sensible defaults.
 |-------|------|---------|-------------|
 | `rubocop_max_lines` | string | `300` | Max lines changed for RuboCop fixes |
 | `stree_max_lines` | string | `200` | Max lines changed for stree formatting |
+| `stree_ignore_files` | string | `''` | Additional file patterns to exclude from stree formatting (space-separated globs) |
 | `prettier_max_lines` | string | `200` | Max lines changed for Prettier formatting |
 | `rubocop_autocorrect_mode` | string | `-a` | `-a` for safe auto-correct, `-A` for all (including unsafe) |
 | `branch_prefix` | string | `improvement` | Prefix for the created branch (e.g. `improvement/2025-02-26-1400`) |
@@ -72,6 +73,7 @@ jobs:
       stree_max_lines: '300'
       prettier_max_lines: '300'
       rubocop_autocorrect_mode: '-A'
+      stree_ignore_files: 'lib/generated/**/*.rb app/templates/**/*.rb'
       dry_run: true
 ```
 
@@ -127,7 +129,7 @@ The workflow auto-detects your project setup:
 
 The workflow automatically excludes vendored dependencies from scanning:
 
-- **stree**: Skips `vendor/**/*.rb` via `--ignore-files`
+- **stree**: Skips `vendor/**/*.rb`, `db/schema.rb`, and `db/migrate/**/*.rb` via `--ignore-files`. Add extra patterns with the `stree_ignore_files` input.
 - **Prettier**: Skips `node_modules/` (Prettier default) and `vendor/`
 - **RuboCop**: Respects exclusions from your `.rubocop.yml` via `--force-exclusion`
 
