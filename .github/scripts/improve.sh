@@ -249,16 +249,13 @@ if [ -n "$stree_cmd" ]; then
   log "Running stree check..."
 
   # Build --ignore-files flags: sensible defaults + caller-supplied extras
-  stree_ignore_flags="--ignore-files='vendor/**/*.rb'"
-  stree_ignore_flags+=" --ignore-files='db/schema.rb'"
-  stree_ignore_flags+=" --ignore-files='db/migrate/**/*.rb'"
+  stree_ignore_flags=("--ignore-files=vendor/**/*.rb" "--ignore-files=db/schema.rb" "--ignore-files=db/migrate/**/*.rb")
   # shellcheck disable=SC2086
   for pattern in $STREE_IGNORE_FILES; do
-    stree_ignore_flags+=" --ignore-files='${pattern}'"
+    stree_ignore_flags+=("--ignore-files=${pattern}")
   done
 
-  # shellcheck disable=SC2086
-  stree_output=$($stree_cmd check $stree_ignore_flags '**/*.rb' 2>&1 || true)
+  stree_output=$($stree_cmd check "${stree_ignore_flags[@]}" '**/*.rb' 2>&1 || true)
 
   # Extract .rb file paths from whatever output format stree produces
   stree_files=""
@@ -400,7 +397,7 @@ if [ "$uses_eslint_prettier" = "true" ]; then
     log "Re-running ESLint on $subset_count of $total_files files..."
 
     echo "$subset_files" | tr '\n' '\0' \
-      | xargs -0 $eslint_bin --fix --no-error-on-unmatched-pattern 2>/dev/null || true
+      | xargs -0 "$eslint_bin" --fix --no-error-on-unmatched-pattern 2>/dev/null || true
     lines=$(diff_lines)
     log "Subset diff: $lines lines."
 
@@ -415,7 +412,7 @@ if [ "$uses_eslint_prettier" = "true" ]; then
       log "Second trim: $subset_count files..."
 
       echo "$subset_files" | tr '\n' '\0' \
-        | xargs -0 $eslint_bin --fix --no-error-on-unmatched-pattern 2>/dev/null || true
+        | xargs -0 "$eslint_bin" --fix --no-error-on-unmatched-pattern 2>/dev/null || true
       lines=$(diff_lines)
       log "Final ESLint+Prettier diff: $lines lines."
     fi
