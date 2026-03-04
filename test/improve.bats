@@ -504,6 +504,106 @@ JSON
   [[ "$title" == *"chore(tidy)"* ]]
 }
 
+# =========================================================================
+# RuboCop + stree conflict warning
+# =========================================================================
+
+@test "stree+rubocop: warns when .rubocop.yml missing syntax_tree config" {
+  touch .rubocop.yml
+  echo 'puts "hello"' > app.rb
+  git add app.rb && git commit -q -m "add app.rb"
+
+  # Mock rubocop as available
+  setup_bundle_mock "rubocop" '
+    if [[ "$*" == *"--version"* ]]; then echo "1.60.0"; exit 0; fi
+    if [[ "$*" == *"--format json"* ]]; then
+      echo "{\"files\": []}"
+      exit 0
+    fi
+    exit 0
+  '
+
+  # Mock stree as available (via bundle exec)
+  setup_bundle_mock "stree" '
+    if [[ "$1" == "version" ]]; then echo "6.0.0"; exit 0; fi
+    if [[ "$1" == "check" ]]; then
+      echo "All files conform"
+      exit 0
+    fi
+  '
+
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"does not inherit syntax_tree config"* ]]
+}
+
+@test "stree+rubocop: no warning when .rubocop.yml inherits syntax_tree" {
+  cat > .rubocop.yml <<'YML'
+inherit_gem:
+  syntax_tree: config/rubocop.yml
+YML
+  echo 'puts "hello"' > app.rb
+  git add . && git commit -q -m "add files"
+
+  setup_bundle_mock "rubocop" '
+    if [[ "$*" == *"--version"* ]]; then echo "1.60.0"; exit 0; fi
+    if [[ "$*" == *"--format json"* ]]; then
+      echo "{\"files\": []}"
+      exit 0
+    fi
+    exit 0
+  '
+
+  setup_bundle_mock "stree" '
+    if [[ "$1" == "version" ]]; then echo "6.0.0"; exit 0; fi
+    if [[ "$1" == "check" ]]; then
+      echo "All files conform"
+      exit 0
+    fi
+  '
+
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"does not inherit syntax_tree config"* ]]
+}
+
+# =========================================================================
+# Diff fingerprint
+# =========================================================================
+
+@test "fingerprint: PR body includes diff-fingerprint when changes exist" {
+  touch .rubocop.yml
+  echo 'puts "hello"' > app.rb
+  git add app.rb && git commit -q -m "add app.rb"
+
+  setup_bundle_mock "rubocop" '
+    if [[ "$*" == *"--version"* ]]; then echo "1.60.0"; exit 0; fi
+    if [[ "$*" == *"--format json"* ]]; then
+      echo "{\"files\": [{\"path\": \"app.rb\", \"offenses\": [{\"cop_name\": \"Style/FrozenStringLiteralComment\", \"correctable\": true}]}]}"
+      exit 0
+    fi
+    if [[ "$*" == *"--only"* ]]; then
+      sed -i.bak "1s/^/# frozen_string_literal: true\n/" app.rb 2>/dev/null || \
+        sed -i "" "1s/^/# frozen_string_literal: true\\
+/" app.rb
+      rm -f app.rb.bak
+      exit 0
+    fi
+  '
+
+  run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+
+  # PR body should contain a diff fingerprint
+  [ -f "$TEST_DIR/pr_body.md" ]
+  grep -qE '<!-- diff-fingerprint:[a-f0-9]{64} -->' "$TEST_DIR/pr_body.md"
+
+  # Output should include diff_fingerprint
+  local fp
+  fp="$(get_output diff_fingerprint)"
+  [ -n "$fp" ]
+}
+
 @test "outputs: custom branch prefix is used" {
   touch .rubocop.yml
   echo 'puts "hello"' > app.rb

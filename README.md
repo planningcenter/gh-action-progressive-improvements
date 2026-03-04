@@ -135,6 +135,21 @@ The workflow automatically excludes vendored dependencies from scanning:
 
 This avoids wasting time scanning third-party code in directories like `vendor/bundle/`.
 
+### RuboCop + stree configuration
+
+If your project uses both RuboCop and [syntax_tree](https://github.com/ruby-syntax-tree/syntax_tree) (stree), the two tools can conflict on formatting rules. In normal development this rarely surfaces, but when the action runs both tools back-to-back across the entire codebase, the conflict can create a loop of identical fix PRs — each tool undoing the other's changes.
+
+**Recommended fix:** Add syntax_tree's RuboCop config to your `.rubocop.yml`:
+
+```yaml
+inherit_gem:
+  syntax_tree: config/rubocop.yml
+```
+
+This disables the RuboCop cops that conflict with stree's formatting. See the [syntax_tree RuboCop docs](https://github.com/ruby-syntax-tree/syntax_tree#rubocop) for details.
+
+The action will emit a warning if it detects both tools are active without this configuration. It also tracks a diff fingerprint across runs and will skip creating a PR if the same changes were already merged recently.
+
 ### Permissions
 
 The workflow requires these permissions on the caller's `GITHUB_TOKEN`:

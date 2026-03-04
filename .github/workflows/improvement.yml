@@ -107,8 +107,39 @@ jobs:
         if: always()
         run: rm -rf .improvement
 
-      - name: Create or update PR
+      - name: Check for duplicate diff
+        id: dedup
         if: steps.improve.outputs.has_changes == 'true' && steps.improve.outputs.dry_run != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          fingerprint="${{ steps.improve.outputs.diff_fingerprint }}"
+          prefix="${{ inputs.branch_prefix || 'improvement' }}"
+
+          if [ -z "$fingerprint" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Checking for duplicate diff fingerprint: $fingerprint"
+
+          # Search recently merged PRs with the same branch prefix
+          recent_bodies=$(gh pr list \
+            --state merged \
+            --limit 5 \
+            --search "head:${prefix}/" \
+            --json body \
+            --jq '.[].body' 2>/dev/null || true)
+
+          if echo "$recent_bodies" | grep -qF "diff-fingerprint:${fingerprint}"; then
+            echo "::warning::Skipping PR — identical changes were already merged recently. This may indicate a tool conflict (e.g. RuboCop vs stree). See: https://github.com/planningcenter/gh-action-progressive-improvements#rubocop--stree-configuration"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update PR
+        if: steps.improve.outputs.has_changes == 'true' && steps.improve.outputs.dry_run != 'true' && steps.dedup.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_ASSIGNEES: ${{ inputs.pr_assignees }}
