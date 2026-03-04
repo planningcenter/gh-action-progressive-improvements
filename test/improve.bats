@@ -284,9 +284,9 @@ JSON
   # Verify the default ignore patterns were passed
   local check_args
   check_args=$(cat "$TEST_DIR/stree_check_args")
-  [[ "$check_args" == *"--ignore-files='vendor/**/*.rb'"* ]]
-  [[ "$check_args" == *"--ignore-files='db/schema.rb'"* ]]
-  [[ "$check_args" == *"--ignore-files='db/migrate/**/*.rb'"* ]]
+  [[ "$check_args" == *"--ignore-files=vendor/**/*.rb"* ]]
+  [[ "$check_args" == *"--ignore-files=db/schema.rb"* ]]
+  [[ "$check_args" == *"--ignore-files=db/migrate/**/*.rb"* ]]
 }
 
 @test "stree: includes custom STREE_IGNORE_FILES patterns" {
@@ -317,12 +317,12 @@ JSON
   local check_args
   check_args=$(cat "$TEST_DIR/stree_check_args")
   # Should have defaults
-  [[ "$check_args" == *"--ignore-files='vendor/**/*.rb'"* ]]
-  [[ "$check_args" == *"--ignore-files='db/schema.rb'"* ]]
-  [[ "$check_args" == *"--ignore-files='db/migrate/**/*.rb'"* ]]
+  [[ "$check_args" == *"--ignore-files=vendor/**/*.rb"* ]]
+  [[ "$check_args" == *"--ignore-files=db/schema.rb"* ]]
+  [[ "$check_args" == *"--ignore-files=db/migrate/**/*.rb"* ]]
   # And custom patterns
-  [[ "$check_args" == *"--ignore-files='lib/generated/**/*.rb'"* ]]
-  [[ "$check_args" == *"--ignore-files='app/templates/**/*.rb'"* ]]
+  [[ "$check_args" == *"--ignore-files=lib/generated/**/*.rb"* ]]
+  [[ "$check_args" == *"--ignore-files=app/templates/**/*.rb"* ]]
 }
 
 @test "stree: all files conforming produces no changes" {
