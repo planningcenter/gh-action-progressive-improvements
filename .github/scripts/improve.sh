@@ -247,6 +247,7 @@ fi
 
 if [ -n "$stree_cmd" ]; then
   log "Running stree check..."
+  # shellcheck disable=SC2086
   stree_output=$($stree_cmd check --ignore-files='vendor/**/*.rb' '**/*.rb' 2>&1 || true)
 
   # Extract .rb file paths from whatever output format stree produces
@@ -260,6 +261,7 @@ if [ -n "$stree_cmd" ]; then
     total_stree_files=$(echo "$stree_files" | wc -l | tr -d ' ')
     log "Found $total_stree_files files needing stree formatting."
 
+    # shellcheck disable=SC2086
     echo "$stree_files" | tr '\n' '\0' | xargs -0 $stree_cmd write 2>/dev/null || true
     lines=$(diff_lines)
     log "Total stree diff: $lines lines."
@@ -273,6 +275,7 @@ if [ -n "$stree_cmd" ]; then
       subset_files=$(echo "$stree_files" | head -n "$subset_count")
       log "Formatting $subset_count of $total_stree_files files..."
 
+      # shellcheck disable=SC2086
       echo "$subset_files" | tr '\n' '\0' | xargs -0 $stree_cmd write 2>/dev/null || true
       lines=$(diff_lines)
       log "Subset diff: $lines lines."
@@ -287,6 +290,7 @@ if [ -n "$stree_cmd" ]; then
         subset_files=$(echo "$stree_files" | head -n "$subset_count")
         log "Second trim: $subset_count files..."
 
+        # shellcheck disable=SC2086
         echo "$subset_files" | tr '\n' '\0' | xargs -0 $stree_cmd write 2>/dev/null || true
         lines=$(diff_lines)
         log "Final stree diff: $lines lines."
@@ -346,6 +350,7 @@ fi
 
 if [ -n "$prettier_bin" ] && [ "$has_prettier_config" = "true" ]; then
   log "Running Prettier check..."
+  # shellcheck disable=SC2086
   prettier_output=$($prettier_bin --check '**/*.{js,jsx,ts,tsx}' '!vendor/**' 2>&1 || true)
 
   # Strip [warn] prefix (older Prettier) and filter to JS/TS file paths
@@ -360,6 +365,7 @@ if [ -n "$prettier_bin" ] && [ "$has_prettier_config" = "true" ]; then
     total_prettier_files=$(echo "$prettier_files" | wc -l | tr -d ' ')
     log "Found $total_prettier_files files needing Prettier formatting."
 
+    # shellcheck disable=SC2086
     echo "$prettier_files" | tr '\n' '\0' | xargs -0 $prettier_bin --write 2>/dev/null || true
     lines=$(diff_lines)
     log "Total Prettier diff: $lines lines."
@@ -373,6 +379,7 @@ if [ -n "$prettier_bin" ] && [ "$has_prettier_config" = "true" ]; then
       subset_files=$(echo "$prettier_files" | head -n "$subset_count")
       log "Formatting $subset_count of $total_prettier_files files..."
 
+      # shellcheck disable=SC2086
       echo "$subset_files" | tr '\n' '\0' | xargs -0 $prettier_bin --write 2>/dev/null || true
       lines=$(diff_lines)
       log "Subset diff: $lines lines."
@@ -387,6 +394,7 @@ if [ -n "$prettier_bin" ] && [ "$has_prettier_config" = "true" ]; then
         subset_files=$(echo "$prettier_files" | head -n "$subset_count")
         log "Second trim: $subset_count files..."
 
+        # shellcheck disable=SC2086
         echo "$subset_files" | tr '\n' '\0' | xargs -0 $prettier_bin --write 2>/dev/null || true
         lines=$(diff_lines)
         log "Final Prettier diff: $lines lines."
