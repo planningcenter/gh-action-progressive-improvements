@@ -53,8 +53,9 @@ if [ -z "$BUMP_TYPE" ]; then
     exit 1
 fi
 
-# Get the latest version tag
-LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+# Get the latest semver version tag (vX.Y.Z), ignoring major-only tags like v0, v1
+LATEST_TAG=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)
+LATEST_TAG="${LATEST_TAG:-v0.0.0}"
 
 # Validate the latest tag format
 if ! [[ "$LATEST_TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
